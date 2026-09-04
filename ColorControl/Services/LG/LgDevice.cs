@@ -71,7 +71,8 @@ namespace ColorControl.Services.LG
             Series2022,
             Series2023,
             Series2024,
-            Series2025
+            Series2025,
+            Series2026
         }
 
         protected static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -579,7 +580,7 @@ namespace ColorControl.Services.LG
 
             Year = suffix switch
             {
-                '6' => ModelYear.SeriesPre2018,
+                '6' => ModelYear.Series2026,
                 '7' => ModelYear.SeriesPre2018,
                 '8' => ModelYear.Series2018,
                 '9' => ModelYear.Series2019,

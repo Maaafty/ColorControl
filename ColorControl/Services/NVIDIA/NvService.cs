@@ -251,6 +251,18 @@ namespace ColorControl.Services.NVIDIA
             return _currentDisplay;
         }
 
+        public bool IsCurrentDisplayHdrEnabled()
+        {
+            var display = GetCurrentDisplay();
+
+            if (display == null)
+            {
+                return false;
+            }
+
+            return IsHDREnabled(display);
+        }
+
         public override bool HasDisplaysAttached(bool reinitialize = false)
         {
             if (reinitialize)

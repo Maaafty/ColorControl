@@ -1,4 +1,5 @@
-﻿using ColorControl.Services.Common;
+﻿using ColorControl.Services.NVIDIA;
+using ColorControl.Services.Common;
 using ColorControl.Shared.Common;
 using ColorControl.Shared.Contracts;
 using ColorControl.Shared.Contracts.LG;
@@ -67,6 +68,7 @@ namespace ColorControl.Services.LG
         private readonly WinApiService _winApiService;
         private readonly WinApiAdminService _winApiAdminService;
         private LgGameBar _gameBarForm;
+        private readonly SemaphoreSlim _displayModeToggleSemaphore = new(1, 1);
 
         private List<LgRcDto> _remotes;
         private string _remotesFilename;
@@ -463,7 +465,57 @@ namespace ColorControl.Services.LG
 
         public override async Task<bool> ApplyPreset(LgPreset preset)
         {
+            if (preset.name.Equals("Toggle Display Mode", StringComparison.OrdinalIgnoreCase))
+            {
+                return await ToggleDisplayMode();
+            }
+
             return await ApplyPreset(preset, false);
+        }
+
+        private async Task<bool> ToggleDisplayMode()
+        {
+            // Ignore repeated key presses while a mode switch is already running.
+            if (!await _displayModeToggleSemaphore.WaitAsync(0))
+            {
+                Logger.Debug("Display mode toggle ignored because another toggle is still running.");
+                return true;
+            }
+
+            try
+            {
+                var nvService = Program.ServiceProvider.GetRequiredService<NvService>();
+                var hdrEnabled = nvService.IsCurrentDisplayHdrEnabled();
+
+                // Our two states are:
+                // SDR 165 -> HDR disabled
+                // HDR 120 -> HDR enabled
+                var targetPresetName = hdrEnabled ? "SDR 165" : "HDR 120";
+
+                var targetPreset = _presets.FirstOrDefault(
+                    p => p.name.Equals(targetPresetName, StringComparison.OrdinalIgnoreCase));
+
+                if (targetPreset == null)
+                {
+                    Logger.Error($"Toggle display mode: LG preset '{targetPresetName}' was not found.");
+                    return false;
+                }
+
+                Logger.Info(
+                    $"Toggle display mode: HDR is currently {(hdrEnabled ? "ON" : "OFF")}, " +
+                    $"applying '{targetPresetName}'.");
+
+                return await ApplyPreset(targetPreset, false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Error while toggling display mode: " + ex.ToLogString());
+                return false;
+            }
+            finally
+            {
+                _displayModeToggleSemaphore.Release();
+            }
         }
 
         public async Task<bool> ApplyPreset(LgPreset preset, bool reconnect = false)
